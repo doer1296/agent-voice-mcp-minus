@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.0-plus] - 2026-08-26
+## [1.3.0-minus] - 2026-08-26
 
 Enhanced fork of [agent-voice-mcp 1.2.0](https://github.com/al96169/agent-voice-mcp). 本版本基于原版增强，聚焦火山引擎豆包语音（seed-tts）实战调优。
 
@@ -19,7 +19,7 @@ Enhanced fork of [agent-voice-mcp 1.2.0](https://github.com/al96169/agent-voice-
 
 ### Changed
 - 提示音默认配置为 `beep:single`（多音阶模式听感机械，保留可切换）
-- MCP serverInfo 更名为 `agent-voice-plus` / 版本 `1.3.0`（注册名 `agent-voice` 不变，不影响客户端配置）
+- MCP serverInfo 更名为 `agent-voice-minus` / 版本 `1.3.0`（注册名 `agent-voice` 不变，不影响客户端配置）
 
 ### Fixed
 - 流式 WAV data 子块长度 `0xFFFFFFFF` 占位导致 Media.SoundPlayer 拒绝播放的问题（客户端修正 chunk 长度）

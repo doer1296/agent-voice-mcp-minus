@@ -20,7 +20,7 @@ const fallbackEngine = config.fallbackEngine === "windows-sapi" && os.platform()
     : null;
 const voiceQueue = new VoiceQueue(engine, 2, config.notificationSound, fallbackEngine);
 const server = new McpServer({
-    name: "agent-voice-plus",
+    name: "agent-voice-minus",
     version: "1.3.0",
 });
 const VALID_SCENES = ["task_start", "task_complete", "task_error", "need_interaction", "milestone"];

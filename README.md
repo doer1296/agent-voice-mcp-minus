@@ -1,4 +1,4 @@
-# agent-voice-mcp-plus
+# agent-voice-mcp-minus
 
 > **agent-voice-mcp 增强版** · 本地 MCP 语音播报服务，为 AI 编程助手（Trae / Claude Desktop / Cursor 等）提供任务进度的语音播报能力，深度适配火山引擎豆包语音合成大模型（seed-tts）。
 >
@@ -39,7 +39,7 @@
   "mcpServers": {
     "agent-voice": {
       "command": "npx",
-      "args": ["-y", "github:doer1296/agent-voice-mcp-plus"]
+      "args": ["-y", "github:doer1296/agent-voice-mcp-minus"]
     }
   }
 }
@@ -48,8 +48,8 @@
 **方式 B · 克隆仓库本地运行（推荐给需要改代码的用户）**
 
 ```bash
-git clone https://github.com/doer1296/agent-voice-mcp-plus.git
-cd agent-voice-mcp-plus
+git clone https://github.com/doer1296/agent-voice-mcp-minus.git
+cd agent-voice-mcp-minus
 npm install
 ```
 
@@ -60,7 +60,7 @@ MCP 配置改为 node 直连（启动更快，且不受 npm 仓库影响）：
   "mcpServers": {
     "agent-voice": {
       "command": "node",
-      "args": ["D:/your/path/agent-voice-mcp-plus/dist/index.js"]
+      "args": ["D:/your/path/agent-voice-mcp-minus/dist/index.js"]
     }
   }
 }
