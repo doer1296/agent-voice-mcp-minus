@@ -207,7 +207,29 @@ seed-tts-2.0 示例：
 | `textClean` | `true` | 播报前文本清洗开关 |
 | `maxTextLength` | `200` | 播报文本截断长度（在句读处收口） |
 | `fallbackEngine` | `windows-sapi` | 云端失败自动兜底（Windows） |
+| `watcher.enabled` | `false` | 备用播报通道开关（见[下节](#备用播报通道watcher可选)） |
+| `watcher.script` | 包内默认 | 自定义 watcher 脚本路径（省略则用包内 `watcher/voice-watcher.mjs`） |
 | `scenes.*` | 见 example | 五场景的 voice/rate/volume/emotion |
+
+---
+
+## 备用播报通道（watcher，可选）
+
+`watcher/voice-watcher.mjs` 是一个**不依赖 MCP 连接**的常驻监听器：轮询 `~/.trae-cn/work/.voice-reader/pending.txt`，发现标记内容即用与主服务相同的云端引擎播报（配置、音色、音量实时同源，云端失败同样回退 SAPI）。
+
+**用途**：当 Agent 会话里 MCP 工具不可用时（如模型切换、MCP 服务崩溃），仍可向该文件写入标记触发播报，形成兜底通道：
+
+```
+[VOICE_READER_START:success]
+要播报的文本
+[VOICE_READER_END]
+```
+
+类型支持 `info` / `success` / `error` / `warning`，分别映射 task_start / task_complete / task_error / need_interaction 场景参数。
+
+**启用方式**：`config.json` 设 `"watcher": { "enabled": true }`。主 MCP 服务启动时自动将其作为子进程拉起、退出时一并回收（TCP 单实例守卫 47613，多会话只跑一份）。也可独立运行：`node watcher/voice-watcher.mjs`。
+
+**路径可移植**：所有路径均为相对推导或 `os.homedir()` 拼接，无写死绝对路径。环境变量可覆盖：`AGENT_VOICE_CONFIG`（配置文件路径）、`AGENT_VOICE_PENDING_DIR`（pending.txt 所在目录，默认 `~/.trae-cn/work/.voice-reader`，适配其他 MCP 客户端）。
 
 ---
 

@@ -7,6 +7,10 @@ import { VoiceQueue, cleanSpeechText, truncateForSpeech } from "./voice-queue.js
 import { loadConfig, resolveOptions, resolveRole } from "./config.js";
 import { WindowsSAPIEngine } from "./tts/windows-sapi.js";
 import os from "os";
+import path from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
+import { spawn } from "child_process";
 const config = loadConfig();
 const engine = createTTSEngine({
     engine: config.engine,
@@ -19,6 +23,59 @@ const fallbackEngine = config.fallbackEngine === "windows-sapi" && os.platform()
     ? new WindowsSAPIEngine()
     : null;
 const voiceQueue = new VoiceQueue(engine, 2, config.notificationSound, fallbackEngine);
+// 附属监听器（pending.txt 备用播报通道）：与主服务同生命周期，由 config.watcher 开关
+// script 未配置时默认使用包内 watcher/voice-watcher.mjs（与 dist/ 同级），开源场景零配置
+// 单实例守卫（TCP 47613）保证多会话只跑一份；守卫被占时子进程退出，稍后重试接管
+const watcherCfg = config.watcher;
+let watcherChild = null;
+function watcherScriptPath() {
+    if (watcherCfg?.script)
+        return watcherCfg.script;
+    return fileURLToPath(new URL("../watcher/voice-watcher.mjs", import.meta.url));
+}
+function spawnWatcher() {
+    if (!watcherCfg?.enabled)
+        return;
+    const script = watcherScriptPath();
+    if (!existsSync(script)) {
+        console.error(`[watcher] script not found, disabled: ${script}`);
+        return;
+    }
+    let child;
+    try {
+        child = spawn(process.execPath, [script], { stdio: "ignore", windowsHide: true });
+    }
+    catch (e) {
+        console.error(`[watcher] spawn failed: ${e.message}`);
+        return;
+    }
+    watcherChild = child;
+    let failed = false;
+    child.on("error", (e) => {
+        failed = true;
+        console.error(`[watcher] ${e.message}`);
+    });
+    child.on("exit", () => {
+        if (watcherChild === child)
+            watcherChild = null;
+        // 启动失败（脚本缺失等）不重试；守卫被其他实例占用则周期性重试接管
+        if (!failed) {
+            const t = setTimeout(spawnWatcher, 30000);
+            t.unref();
+        }
+    });
+}
+spawnWatcher();
+process.on("exit", () => {
+    if (watcherChild)
+        watcherChild.kill();
+});
+// 客户端断开（MCP 连接关闭）时回收监听器并退出——子进程句柄会把事件循环挂住，必须显式退出
+process.stdin.on("end", () => {
+    if (watcherChild)
+        watcherChild.kill();
+    process.exit(0);
+});
 const server = new McpServer({
     name: "agent-voice-minus",
     version: "1.3.0",

@@ -15,6 +15,7 @@ Enhanced fork of [agent-voice-mcp 1.2.0](https://github.com/al96169/agent-voice-
 - **场景化提示音**：`beep:` 前缀提示音系统（`beep:single` 单音警示为默认，另有 info/success/error/warning/milestone 多音阶模式可选）
 - **蓝牙前导静音**：`leadingSilence`（默认 1500ms）在语音前插入静音，防止蓝牙耳机连接杂音吞掉首字
 - **PCM→WAV 客户端封装**：流式 PCM 拼接后统一封装合法 RIFF/WAVE（兼容 Media.SoundPlayer）
+- **备用播报通道（watcher）**：`watcher/voice-watcher.mjs` 常驻监听器（轮询 pending.txt 标记，云端引擎 + SAPI 兜底）。主服务启动时自动拉起子进程、退出时回收；TCP 单实例守卫（47613）防多实例重复播报。全部路径相对推导 / `os.homedir()` 拼接，支持 `AGENT_VOICE_CONFIG`、`AGENT_VOICE_PENDING_DIR` 环境变量覆盖，无写死绝对路径
 - **配置模板**：`config.example.json`，支持 `${ENV_VAR}` 环境变量引用（如 `${VOLCANO_API_KEY}`），避免 API Key 明文落盘
 
 ### Changed

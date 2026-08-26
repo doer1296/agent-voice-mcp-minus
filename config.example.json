@@ -29,6 +29,9 @@
   "textClean": true,
   "maxTextLength": 200,
   "fallbackEngine": "windows-sapi",
+  "watcher": {
+    "enabled": true
+  },
   "scenes": {
     "task_start": {
       "voice": "zh_female_daimengchuanmei_moon_bigtts",
