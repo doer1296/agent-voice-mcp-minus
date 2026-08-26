@@ -1,0 +1,1 @@
+{"version":3,"file":"audio-player.d.ts","sourceRoot":"","sources":["../../src/tts/audio-player.ts"],"names":[],"mappings":"AAAA,OAAO,EAAmB,YAAY,EAAE,MAAM,eAAe,CAAC;AAiB9D,wBAAgB,cAAc,IAAI;IAAE,OAAO,EAAE,MAAM,CAAC;IAAC,IAAI,EAAE,MAAM,EAAE,CAAA;CAAE,CAWpE;AAED,wBAAgB,aAAa,CAC3B,QAAQ,EAAE,MAAM,EAChB,SAAS,EAAE,CAAC,IAAI,EAAE,YAAY,KAAK,IAAI,GACtC,OAAO,CAAC,IAAI,CAAC,CA6Bf"}

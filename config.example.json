@@ -1,0 +1,64 @@
+{
+  "engine": "cloud",
+  "cloud": {
+    "provider": "volcano",
+    "apiKey": "${VOLCANO_API_KEY}",
+    "voice": "zh_female_daimengchuanmei_moon_bigtts",
+    "resourceId": "seed-tts-1.0",
+    "format": "pcm",
+    "sampleRate": 24000,
+    "silenceDuration": 400,
+    "disableMarkdownFilter": true,
+    "disableEmojiFilter": true,
+    "leadingSilence": 1500,
+    "pauseControl": true,
+    "pauseSentenceMs": 400,
+    "pauseCommaMs": 200,
+    "timeout": 30000
+  },
+  "rate": 200,
+  "volume": 1.3,
+  "notificationSound": "melodious",
+  "sceneSounds": {
+    "task_start": "beep:single",
+    "task_complete": "beep:single",
+    "task_error": "beep:single",
+    "need_interaction": "beep:single",
+    "milestone": "beep:single"
+  },
+  "textClean": true,
+  "maxTextLength": 200,
+  "fallbackEngine": "windows-sapi",
+  "scenes": {
+    "task_start": {
+      "voice": "zh_female_daimengchuanmei_moon_bigtts",
+      "rate": 190,
+      "volume": 1.3,
+      "emotion": "calm"
+    },
+    "task_complete": {
+      "voice": "zh_female_daimengchuanmei_moon_bigtts",
+      "rate": 220,
+      "volume": 1.3,
+      "emotion": "happy"
+    },
+    "task_error": {
+      "voice": "zh_female_daimengchuanmei_moon_bigtts",
+      "rate": 210,
+      "volume": 1.3,
+      "emotion": "angry"
+    },
+    "need_interaction": {
+      "voice": "zh_female_daimengchuanmei_moon_bigtts",
+      "rate": 200,
+      "volume": 1.3,
+      "emotion": "calm"
+    },
+    "milestone": {
+      "voice": "zh_female_daimengchuanmei_moon_bigtts",
+      "rate": 210,
+      "volume": 1.3,
+      "emotion": "happy"
+    }
+  }
+}

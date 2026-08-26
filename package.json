@@ -1,0 +1,48 @@
+{
+  "name": "agent-voice-mcp-plus",
+  "version": "1.3.0",
+  "description": "agent-voice-mcp 增强版（fork of al96169/agent-voice-mcp）：本地 MCP 语音播报服务，火山引擎豆包 seed-tts 深度适配 —— 情绪声学映射 / 长文案停顿控制 / 文本清洗 / SAPI 兜底 / 场景提示音 / 蓝牙前导静音",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "agent-voice-mcp-plus": "dist/index.js"
+  },
+  "scripts": {
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "tts",
+    "voice",
+    "speech",
+    "mcp-server",
+    "agent",
+    "ai",
+    "volcano",
+    "doubao",
+    "seed-tts"
+  ],
+  "author": "Antonio Liang (original agent-voice-mcp)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doer1296/agent-voice-mcp-plus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/doer1296/agent-voice-mcp-plus/issues"
+  },
+  "homepage": "https://github.com/doer1296/agent-voice-mcp-plus#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "config.example.json"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0"
+  }
+}
