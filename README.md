@@ -1,6 +1,6 @@
 # agent-voice-mcp-minus
 
-> **agent-voice-mcp 增强版** · 本地 MCP 语音播报服务，为 AI 编程助手（Trae / Claude Desktop / Cursor 等）提供任务进度的语音播报能力，深度适配火山引擎豆包语音合成大模型（seed-tts）。
+> **agent-voice-mcp 增强版** · 本地 MCP 语音播报服务，为 AI 编程助手（Trae / Claude Desktop / Cursor 等）提供任务进度的语音播报能力，深度适配火山引擎豆包语音合成大模型（seed-tts），并内置小米 MiMo V2.5 第二云端引擎。
 >
 > 本项目 fork 自 [al96169/agent-voice-mcp](https://github.com/al96169/agent-voice-mcp)（作者 Antonio Liang，MIT 协议），在其基础上针对火山引擎 v3 接口与真实使用场景做了大量实测调优。**原版是本体，本项目是本体 + 实战增强**，全部增强均可通过配置开关关闭、回退到接近原版的行为。
 
@@ -11,9 +11,13 @@
 | 特性 | 说明 |
 |------|------|
 | 火山 v3 流式接口 | 适配 `/api/v3/tts/unidirectional` 新版接口（X-Api-Key 鉴权） |
+| MiMo V2.5 第二引擎 | 小米 MiMo TTS（OpenAI 兼容端点），情绪/语速由自然语言「导演指令」表达，支持逐场景指令覆写（见[下文](#mimo-v25-第二引擎可选)） |
 | 情绪声学映射 | `emotion` → 音调/语速/音量组合的客户端映射（见[注意事项](#注意事项)第 3 条） |
 | 长文案停顿控制 | 按句切分并行合成 + 段间静音，长播报有呼吸感、节奏自然 |
 | 播报前文本清洗 | 自动去代码块/URL/Markdown 标记 + 截断，不会把「井号、反引号」读出来 |
+| 配置实时生效 | 每次播报前自动重读 `config.json`，改配置**无需重启客户端**；改坏时回退上一份有效配置，播报不中断 |
+| 引擎自动选择 | `engine: "auto"`：配置了任一云端 Key 即用云端，无 Key 自动落本地引擎，开箱即响 |
+| 音色防串用守卫 | 火山/MiMo 音色互传时自动回退本引擎配置音色，多引擎共存不会炸请求 |
 | SAPI 本地兜底 | 云端失败（断网/超时/key 失效/额度耗尽）自动切换 Windows 本地语音，**播报永不中断** |
 | 场景化提示音 | 播报前先响一声提示音，提前唤醒蓝牙耳机音频链路 |
 | 蓝牙前导静音 | 语音前 1.5 秒静音，防止蓝牙连接杂音吞掉首字（详见[前导静音](#蓝牙前导静音重要)） |
@@ -26,7 +30,7 @@
 
 - **Node.js ≥ 18**（[下载](https://nodejs.org/)）
 - **Windows**（云端合成跨平台可用；SAPI 兜底与蜂鸣提示音为 Windows 专属，其他平台自动降级）
-- **火山引擎账号**（需开通语音合成大模型服务，见[第二步](#第二步获取火山引擎凭据)）
+- **云端引擎账号（火山 / MiMo 二选一，均可先不配）**：火山见[第二步](#第二步获取火山引擎凭据)；MiMo 见[第二引擎章节](#mimo-v25-第二引擎可选)。`engine: "auto"` 下无任何 Key 也会用本地语音出声
 
 ### 第一步：配置 MCP 客户端
 
@@ -175,6 +179,63 @@ seed-tts-2.0 示例：
 
 ---
 
+## MiMo V2.5 第二引擎（可选）
+
+v1.4.0 新增小米 [MiMo V2.5 TTS](https://mimo.xiaomi.com/mimo-v2-5-tts) 作为第二云端引擎（OpenAI 兼容端点，Bearer 鉴权）。它与火山的参数面完全不同：**没有数值型语速/音量控制，控制面是自然语言「导演指令」**——`emotion` / `rate` / `volume` 等数值参数由客户端量化翻译为指令文字，模型按指示演绎。
+
+### 启用方式
+
+`config.json` 中把 `cloud.provider` 改为 `"mimo"` 并填入 apiKey。推荐分区写法——火山与 MiMo 的键共存，改一个字段即可来回切换：
+
+```json
+"cloud": {
+  "provider": "mimo",
+  "volcano": {
+    "apiKey": "${VOLCANO_API_KEY}",
+    "voice": "zh_female_daimengchuanmei_moon_bigtts",
+    "resourceId": "seed-tts-1.0"
+  },
+  "mimo": {
+    "apiKey": "${MIMO_API_KEY}",
+    "voice": "冰糖"
+  }
+}
+```
+
+未显式指定 `provider` 时按存在的分区自动探测（只配了 `mimo` 分区 → MiMo）；旧的扁平写法（`cloud.apiKey` 直属 cloud）不改一字仍然有效（视为 volcano）。
+
+### 预置音色（9 个）
+
+| Voice ID | 语言 | 性别 | 说明 |
+|----------|------|------|------|
+| `mimo_default` | zh | 女 | 默认音色 |
+| `冰糖` | zh | 女 | 甜美女声 |
+| `茉莉` | zh | 女 | 温柔女声 |
+| `苏打` | zh | 男 | 清爽男声 |
+| `白桦` | zh | 男 | 沉稳男声 |
+| `Mia` / `Chloe` | en | 女 | 英文女声 |
+| `Milo` / `Dean` | en | 男 | 英文男声 |
+
+中文音色的 Voice ID 就是中文名本身。**音色防串用守卫**：传入非 MiMo 音色（如火山 `zh_female_*`）会自动回退为配置音色并输出告警，不会发出注定失败的请求。
+
+### 指令覆写（进阶）
+
+- `cloud.mimo.emotionPrompts` — 逐情绪覆写导演指令，如 `{"happy": "用轻快上扬、充满喜悦的语气朗读，声音明亮有活力"}`
+- `cloud.mimo.scenePrompts` — **逐场景**导演指令（MiMo 的差异化能力），如 `{"task_error": "报告错误时语气严肃但不夸张，语速平稳"}`。火山只能把场景映射为音色/语速/情绪组合，MiMo 可以让服务端按任意自然语言演绎场景语气
+
+### 与火山的差异速览
+
+| 维度 | 火山 seed-tts | MiMo V2.5 |
+|------|---------------|-----------|
+| 情绪表达 | 客户端声学映射（pitch/语速/音量偏移） | 自然语言导演指令，服务端演绎 |
+| 语速/音量 | 精确数值（±% 级，见第五节） | 四档/两档指令（粒度较粗，模型硬限制） |
+| 场景化语气 | 场景 → 音色/语速/情绪参数组合 | `scenePrompts` 原生指令 |
+| 音频输出 | pcm 24kHz 单声道 | pcm16 24kHz 单声道（共用同一条停顿管线，长文案体验一致） |
+
+选型建议：要精确的数值控制与成熟文档选火山；要更「会演」的场景化语气、且想避开单一供应商依赖选 MiMo。两者可同时配置、随时切换。
+
+---
+
 ## 六、蓝牙前导静音（重要）
 
 `cloud.leadingSilence`（**默认 `1500`，即 1.5 秒**）：
@@ -191,8 +252,13 @@ seed-tts-2.0 示例：
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `cloud.provider` | `volcano` | 云端引擎（另支持 openai / custom / edge-tts） |
+| `engine` | `cloud` | 语音引擎：`cloud` / `auto`（有任一云端 Key 用云端，无 Key 落本地引擎）/ `windows-sapi` / `edge-tts` / `piper`，缺省按平台选本地引擎 |
+| `startupWelcome` | 原文案 | 启动欢迎语：`false` 关闭，字符串为自定义文案 |
+| `cloud.provider` | `volcano` | 云端供应商：`volcano` / `mimo` / `openai` / `custom`（未指定时按存在的分区自动探测） |
 | `cloud.apiKey` | — | 火山引擎 X-Api-Key（支持 `${ENV_VAR}`） |
+| `cloud.volcano.*` / `cloud.mimo.*` | — | 供应商分区：与扁平键共存、分区键优先，双引擎随时切换（见[MiMo 章节](#mimo-v25-第二引擎可选)） |
+| `cloud.mimo.voice` | `mimo_default` | MiMo 音色（中文音色 ID 即中文名，共 9 个预置） |
+| `cloud.mimo.emotionPrompts` / `scenePrompts` | 内置指令 | MiMo 逐情绪 / 逐场景「导演指令」覆写 |
 | `cloud.voice` | `zh_female_daimengchuanmei_moon_bigtts` | 音色 ID（须匹配模型版本） |
 | `cloud.resourceId` | `seed-tts-1.0` | 合成大模型（1.0 / 2.0） |
 | `cloud.format` | `pcm` | 流式推荐 pcm（客户端自动封装 WAV） |
@@ -235,9 +301,9 @@ seed-tts-2.0 示例：
 
 ## 注意事项
 
-1. **配置在 MCP 启动时加载一次**。修改 `config.json` 后需重启客户端 / 新开会话才生效（不是每次播报都重新读取）。
+1. **配置实时生效**（v1.4.0 起）：每次播报前自动重读 `config.json`，改音色/语速/场景/引擎配置后下一条播报即生效，无需重启客户端。若中途把文件改坏（JSON 语法错误），自动沿用上一份有效配置并在日志告警，播报不中断；MCP 工具注册等启动期行为仍需重启。
 2. **采样率与声道**：实测该音色真实带宽 ≤ 12kHz，请求 32/44.1/48kHz 仅为插值上采样、无音质增益（多窗口 FFT 频带分析验证）；API 仅支持单声道，播放时系统自动混音双耳。保持 `24000` 即最优。
-3. **情绪是客户端实现的**：seed-tts-1.0 的 v3 接口不支持服务端 emotion 参数（实测传入被静默忽略），本项目通过音调（pitch ±12）+ 语速/音量偏移组合表达六种情绪，`emotionIntensity` 控制强度。
+3. **情绪的表达方式因引擎而异**：火山 seed-tts-1.0 的 v3 接口不支持服务端 emotion 参数（实测传入被静默忽略），本项目通过音调（pitch ±12）+ 语速/音量偏移组合表达六种情绪，`emotionIntensity` 控制强度；MiMo 引擎则由客户端把情绪量化为自然语言「导演指令」，服务端原生演绎（见[ MiMo 章节](#mimo-v25-第二引擎可选)）。
 4. **勿开启 SSML**：SSML `<break>` 停顿标签在 1.0 + v3 流式接口实测会截断音频（只合成第一句），长文案停顿已由客户端方案实现，无需 SSML。
 5. **额度与计费**：火山引擎按字符计费，任务播报文案建议简短（本项目默认截断 200 字也部分出于此）；额度耗尽自动降级本地 SAPI 语音（音色会变，属正常现象）。
 6. **Windows 依赖**：提示音用 `System.Console::Beep`，语音播放用 PowerShell `Media.SoundPlayer`——Windows 自带，但若被组策略禁用 PowerShell 则相关功能降级。

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-09-01
+
+双云端引擎 + 配置实时生效。反向同步自 DeepSeek Harness 审查清单（P0×5 / P1×4）与 MiMo 集成计划。
+
+### Added
+- **MiMo V2.5 第二云端引擎**：小米 MiMo TTS（OpenAI 兼容端点，Bearer 鉴权），`cloud.provider: "mimo"` 启用。参数面与火山完全不同——无数值型语速/音量，控制面是自然语言「导演指令」：`emotion` → 情绪指令（`emotionPrompts` 可逐条覆写）、`emotionIntensity` → 三档强度副词、`rate` → 四档语速指令、`volume` → 轻重指令、`scene` → 逐场景指令（`scenePrompts`，服务端原生场景化语气，火山做不到的差异化能力）。9 个预置音色白名单（中文音色 ID 即中文名），非 MiMo 音色自动回退配置音色（与火山侧守卫对称）；pcm16 24kHz 单声道，复用同一条长文案停顿管线
+- **供应商配置分区**：`cloud.volcano` / `cloud.mimo` 分区对象与旧扁平键（`cloud.apiKey` 直属）共存，分区键优先；未显式指定 `provider` 时按存在的分区自动探测；**旧配置文件不改一字仍然有效**（向后兼容）
+- **配置实时生效**：每次播报前自动重读 `config.json`（与 watcher 通道行为对齐），修改音色/语速/场景/引擎配置后下一条播报即生效，无需重启 MCP 客户端；引擎级配置变更原地重建引擎。JSON 解析失败（写入中断/语法错误/BOM）时回退上一份有效配置而非清空为默认值，播报不中断
+- **引擎自动选择**：`engine: "auto"` —— 任一云端 Key（含分区键）已配置则用云端引擎，无 Key 自动落本地平台引擎并告警提示，杜绝「无 Key 启动即报错」；`getVoices` 返回精选实测音色 + 官方音色库链接
+- **启动欢迎语可配置**：`startupWelcome` —— `false` 关闭，字符串为自定义文案，缺省播报原文案
+
+### Changed
+- SAPI 本地引擎中文音色探测改为按语音 Culture（`zh-*`）判定（原名称匹配），无中文语音时回退 huihui 并输出安装指引
+- 提示音播放由 `Play()` + 固定 3 秒死等改为 `PlaySync()` 按实际时长等待（melodious 模式实播 1.7 秒，每条播报省约 1.3 秒）
+- 未解析的 `${ENV_VAR}` 占位符 apiKey 现视为「未配置」走兜底链，不再发起注定 401 的请求
+- serverInfo 版本号改为从 `package.json` 读取（单一来源，免双处维护）
+- 火山引擎增加音色前缀守卫：非火山音色 ID（如 MiMo 中文名音色）自动回退配置音色并告警
+
+### Refactored
+- 抽取 `pcm-utils.js`（`pcmToWav` / `silenceBytes` / `splitForPauses` / `clampInt`），火山与 MiMo 两个 Provider 共用（零行为变化，逐函数验证）
+
+### Notes
+- MiMo 数值参数为客户端量化指令（粒度受模型限制）：语速四档、音量两档，需精确 ±% 数值控制仍建议火山引擎
+- HTTP 200 但无 `audio.data` 视为硬错误显式抛出（防「静默成功」）
+
 ## [1.3.0-minus] - 2026-08-26
 
 Enhanced fork of [agent-voice-mcp 1.2.0](https://github.com/al96169/agent-voice-mcp). 本版本基于原版增强，聚焦火山引擎豆包语音（seed-tts）实战调优。
