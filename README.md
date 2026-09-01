@@ -21,6 +21,7 @@
 | SAPI 本地兜底 | 云端失败（断网/超时/key 失效/额度耗尽）自动切换 Windows 本地语音，**播报永不中断** |
 | 场景化提示音 | 播报前先响一声提示音，提前唤醒蓝牙耳机音频链路 |
 | 蓝牙前导静音 | 语音前 1.5 秒静音，防止蓝牙连接杂音吞掉首字（详见[前导静音](#蓝牙前导静音重要)） |
+| 可视化控制台 | 浏览器打开 `http://127.0.0.1:47614`：状态面板 / 试播 / 音色试听 / 配置编辑（Key 脱敏，见[控制台章节](#可视化控制台web-console)） |
 
 ---
 
@@ -236,6 +237,30 @@ v1.4.0 新增小米 [MiMo V2.5 TTS](https://mimo.xiaomi.com/mimo-v2-5-tts) 作�
 
 ---
 
+## 可视化控制台（Web Console）
+
+`config.json` 中 `webui.enabled: true`（示例配置默认开启）时，服务启动后在本机回环地址提供一个控制台，浏览器（或 Trae / Cursor 的内置浏览器）打开：
+
+```
+http://127.0.0.1:47614
+```
+
+与 MCP 服务同生命周期，四个区域：
+
+| 区域 | 说明 |
+|------|------|
+| 状态面板 | 引擎 / 供应商 / 当前音色 / 播报队列 / API Key 是否配置 / 运行时长，5 秒自动刷新 |
+| 试播 | 任意文本 + 场景 / 情绪 / 语速 / 音量 / 强度组合播报，与 Agent 调用 `speak` 工具走**同一条队列与提示音逻辑** |
+| 音色试听 | 当前引擎音色一键试听（来自 `getVoices`，点按钮即用该音色播报示例句） |
+| 配置编辑 | 在线编辑 `config.json`：API Key 显示为 `****`、保存时脱敏字段不会被改动（真实 Key 永不经过浏览器）；JSON 语法校验，语法错误拒绝写入；保存后下一条播报即生效（配置热重载），引擎级变更自动重建引擎 |
+
+**安全设计**：仅监听 `127.0.0.1`（不对外网暴露）；Host / Origin 白名单拦截浏览器 CSRF 与 DNS rebinding 攻击；非浏览器客户端（curl / 脚本）不受影响。
+
+**多会话**：多个 Trae 会话各自拉起 MCP 服务时端口先到先得（默认 `47614`，`webui.port` 可改），持有者退出后其余实例 30 秒内自动接管，控制台持续可用。
+
+
+---
+
 ## 六、蓝牙前导静音（重要）
 
 `cloud.leadingSilence`（**默认 `1500`，即 1.5 秒**）：
@@ -273,6 +298,8 @@ v1.4.0 新增小米 [MiMo V2.5 TTS](https://mimo.xiaomi.com/mimo-v2-5-tts) 作�
 | `textClean` | `true` | 播报前文本清洗开关 |
 | `maxTextLength` | `200` | 播报文本截断长度（在句读处收口） |
 | `fallbackEngine` | `windows-sapi` | 云端失败自动兜底（Windows） |
+| `webui.enabled` | `false` | [可视化控制台](#可视化控制台web-console)开关 |
+| `webui.port` | `47614` | 控制台端口（仅监听 127.0.0.1） |
 | `watcher.enabled` | `false` | 备用播报通道开关（见[下节](#备用播报通道watcher可选)） |
 | `watcher.script` | 包内默认 | 自定义 watcher 脚本路径（省略则用包内 `watcher/voice-watcher.mjs`） |
 | `scenes.*` | 见 example | 五场景的 voice/rate/volume/emotion |
@@ -295,7 +322,7 @@ v1.4.0 新增小米 [MiMo V2.5 TTS](https://mimo.xiaomi.com/mimo-v2-5-tts) 作�
 
 **启用方式**：`config.json` 设 `"watcher": { "enabled": true }`。主 MCP 服务启动时自动将其作为子进程拉起、退出时一并回收（TCP 单实例守卫 47613，多会话只跑一份）。也可独立运行：`node watcher/voice-watcher.mjs`。
 
-**路径可移植**：所有路径均为相对推导或 `os.homedir()` 拼接，无写死绝对路径。环境变量可覆盖：`AGENT_VOICE_CONFIG`（配置文件路径）、`AGENT_VOICE_PENDING_DIR`（pending.txt 所在目录，默认 `~/.trae-cn/work/.voice-reader`，适配其他 MCP 客户端）。
+**路径可移植**：所有路径均为相对推导或 `os.homedir()` 拼接，无写死绝对路径。环境变量可覆盖：`AGENT_VOICE_CONFIG`（配置文件路径，v1.5.0 起主服务与 watcher 均支持）、`AGENT_VOICE_PENDING_DIR`（pending.txt 所在目录，默认 `~/.trae-cn/work/.voice-reader`，适配其他 MCP 客户端）。
 
 ---
 

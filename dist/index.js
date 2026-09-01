@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import { spawn } from "child_process";
 import { createRequire } from "module";
+import { startWebUI } from "./webui.js";
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json");
 const config = loadConfig();
@@ -117,34 +118,41 @@ process.stdin.on("end", () => {
         watcherChild.kill();
     process.exit(0);
 });
+// 可视化控制台（v1.5.0）：config.webui.enabled 开关；仅监听 127.0.0.1（默认端口 47614），
+// 与主服务同生命周期。多会话实例先到先得，端口被占者 30 秒周期重试接管（与 watcher 同策略）。
+// speak 与 MCP 工具共用同一条队列与提示音逻辑；配置读写走原文文件（Key 脱敏）。
+const webuiCfg = config.webui;
+if (webuiCfg?.enabled) {
+    startWebUI({
+        port: webuiCfg.port,
+        handle: {
+            speak: speakByParams,
+            stop: () => voiceQueue.stop(),
+            voices: () => engine.getVoices(),
+            status: () => {
+                const cfg = reloadConfig();
+                const c = cfg.cloud || {};
+                return {
+                    version: PKG_VERSION,
+                    engine: cfg.engine || "auto(本地)",
+                    provider: engine.providerType || "local",
+                    voice: engine.provider?.config?.voice || cfg.voice || "—",
+                    keyConfigured: Boolean(c.apiKey || c.volcano?.apiKey || c.mimo?.apiKey),
+                    queueLength: voiceQueue.queue.length,
+                    speaking: voiceQueue.processing,
+                };
+            },
+        },
+    });
+}
 const server = new McpServer({
     name: "agent-voice-minus",
     version: PKG_VERSION,
 });
 const VALID_SCENES = ["task_start", "task_complete", "task_error", "need_interaction", "milestone"];
 const VALID_EMOTIONS = ["neutral", "happy", "sad", "angry", "calm", "excited"];
-server.registerTool("speak", {
-    description: "通过TTS语音播报文本。语音播报不阻塞Agent执行，超出队列上限(2条)的历史语音将被丢弃。",
-    inputSchema: {
-        text: z.string().describe("要播报的文本内容"),
-        voice: z.string().optional().describe("TTS音色名称，不传则使用配置文件默认音色"),
-        rate: z.number().optional().describe("语速，范围50-300词/分钟，不传则使用配置文件默认值，超范围自动钳制"),
-        volume: z.number().optional().describe("音量，范围0-1，不传则使用配置文件默认值，超范围自动钳制"),
-        scene: z
-            .string()
-            .optional()
-            .describe("播报场景类型，传入后自动应用该场景在配置中的音色/语速/音量。非法值回退为 task_start"),
-        emotion: z
-            .string()
-            .optional()
-            .describe("播报情感类型，不传则使用配置文件默认值。非法值回退为 neutral"),
-        emotionIntensity: z.number().min(0).max(1).optional().describe("情感强度，范围0-1，默认1.0"),
-        role: z
-            .string()
-            .optional()
-            .describe("指定播报角色名称或目标Agent名称（如'Trae'、'Claude'）。可用角色参见 get_roles 工具返回的列表。未指定时使用配置的第一个角色"),
-    },
-}, async ({ text, voice, rate, volume, scene, emotion, emotionIntensity, role: roleParam }) => {
+// speak 主管道（MCP 工具与 webui 控制台共用）：参数容错 → 场景解析 → 文本清洗 → 入队
+async function speakByParams({ text, voice, rate, volume, scene, emotion, emotionIntensity, role: roleParam }) {
     // 配置实时生效（B1）：每次播报前重读 config.json；引擎级配置变更时热重建
     const cfg = reloadConfig();
     refreshEnginesIfNeeded(cfg);
@@ -182,6 +190,31 @@ server.registerTool("speak", {
             ?? cfg.notificationSound;
         voiceQueue.enqueue(speechText, resolved, sceneSound);
     }
+    return { ok: Boolean(speechText), voice: resolved.voice, rate: resolved.rate, volume: resolved.volume, emotion: resolved.emotion, scene: safeScene, speechText };
+}
+server.registerTool("speak", {
+    description: "通过TTS语音播报文本。语音播报不阻塞Agent执行，超出队列上限(2条)的历史语音将被丢弃。",
+    inputSchema: {
+        text: z.string().describe("要播报的文本内容"),
+        voice: z.string().optional().describe("TTS音色名称，不传则使用配置文件默认音色"),
+        rate: z.number().optional().describe("语速，范围50-300词/分钟，不传则使用配置文件默认值，超范围自动钳制"),
+        volume: z.number().optional().describe("音量，范围0-1，不传则使用配置文件默认值，超范围自动钳制"),
+        scene: z
+            .string()
+            .optional()
+            .describe("播报场景类型，传入后自动应用该场景在配置中的音色/语速/音量。非法值回退为 task_start"),
+        emotion: z
+            .string()
+            .optional()
+            .describe("播报情感类型，不传则使用配置文件默认值。非法值回退为 neutral"),
+        emotionIntensity: z.number().min(0).max(1).optional().describe("情感强度，范围0-1，默认1.0"),
+        role: z
+            .string()
+            .optional()
+            .describe("指定播报角色名称或目标Agent名称（如'Trae'、'Claude'）。可用角色参见 get_roles 工具返回的列表。未指定时使用配置的第一个角色"),
+    },
+}, async (params) => {
+    await speakByParams(params);
     return {
         content: [{ type: "text", text: "OK" }],
     };

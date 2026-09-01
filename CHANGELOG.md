@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-09-01
+
+可视化控制台：不写配置文件、不读日志，浏览器里直接看状态、试音色、改配置。
+
+### Added
+- **可视化控制台（Web Console）**：`webui.enabled: true` 时服务在本机回环地址（默认 `127.0.0.1:47614`）提供一个单页控制台，与 MCP 服务同生命周期。状态面板（引擎/供应商/音色/队列/Key 配置状态/运行时长，5 秒自动刷新）、组合试播（场景/情绪/语速/音量/强度，与 Agent 调用 `speak` 走同一条队列）、音色一键试听（`getVoices`）、在线配置编辑（JSON 语法校验；API Key 脱敏为 `****` 且保存时自动还原，真实 Key 永不经过浏览器；保存后下一条播报即生效）。安全设计：仅监听 `127.0.0.1`，Host/Origin 白名单拦截浏览器 CSRF 与 DNS rebinding；多会话端口先到先得，持有者退出后其余实例 30 秒内自动接管
+- `speak` 主管道抽取为 MCP 工具与 Web 控制台共用的单一入口（行为零变化，冒烟回归验证）
+
+### Fixed
+- 主服务现在支持 `AGENT_VOICE_CONFIG` 环境变量覆盖配置文件路径（此前仅 watcher 支持，与 README 描述不符）
+- 供应商分区配置（`cloud.volcano` / `cloud.mimo`，无扁平 `cloud.apiKey`）时误报「引用了未设置的环境变量」告警日志（A3 检查条件修正，现只对真实未解析占位符告警，且覆盖全部三处 Key 路径）
+
 ## [1.4.0] - 2026-09-01
 
 双云端引擎 + 配置实时生效。反向同步自 DeepSeek Harness 审查清单（P0×5 / P1×4）与 MiMo 集成计划。

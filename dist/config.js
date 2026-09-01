@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 import os from "os";
-const DEFAULT_CONFIG_PATH = path.join(os.homedir(), ".agent-voice", "config.json");
+// AGENT_VOICE_CONFIG 环境变量覆盖配置文件路径（与 watcher/voice-watcher.mjs 行为对齐）
+const DEFAULT_CONFIG_PATH = process.env.AGENT_VOICE_CONFIG
+    ? path.resolve(process.env.AGENT_VOICE_CONFIG)
+    : path.join(os.homedir(), ".agent-voice", "config.json");
 const DEFAULT_CONFIG = {
     voice: undefined,
     rate: 200,
@@ -52,11 +55,16 @@ export function loadConfig(configPath) {
     if (existsSync(resolvedPath)) {
         try {
             fileConfig = JSON.parse(readFileSync(resolvedPath, "utf-8"));
-            fileConfig = stripUnresolvedEnvLiterals(resolveEnvVars(fileConfig));
-            if (fileConfig.cloud?.apiKey === undefined) {
-                // 占位符未被环境变量替换：提示后按未配置处理（不会发起注定 401 的请求）
-                console.error(`agent-voice: cloud.apiKey 引用了未设置的环境变量（${resolvedPath}），按未配置处理`);
+            fileConfig = resolveEnvVars(fileConfig);
+            // 占位符未被环境变量替换：提示后按未配置处理（不会发起注定 401 的请求）。
+            // 先在 strip 前检查：分区配置（cloud.{volcano,mimo}.apiKey，无扁平键）不应误报。
+            for (const keyPath of [["cloud", "apiKey"], ["cloud", "volcano", "apiKey"], ["cloud", "mimo", "apiKey"]]) {
+                const v = keyPath.reduce((n, k) => (n && typeof n === "object" ? n[k] : undefined), fileConfig);
+                if (typeof v === "string" && /\$\{[^}]+\}/.test(v)) {
+                    console.error(`agent-voice: ${keyPath.join(".")} 引用了未设置的环境变量（${resolvedPath}），按未配置处理`);
+                }
             }
+            fileConfig = stripUnresolvedEnvLiterals(fileConfig);
         }
         catch {
             parseFailed = true;

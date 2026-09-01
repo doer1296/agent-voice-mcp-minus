@@ -1,6 +1,6 @@
 {
   "name": "agent-voice-mcp-minus",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "agent-voice-mcp 增强版（fork of al96169/agent-voice-mcp）：本地 MCP 语音播报服务，火山引擎豆包 seed-tts 深度适配 + 小米 MiMo V2.5 第二引擎 —— 情绪声学映射 / 自然语言导演指令 / 配置实时生效 / 引擎自动选择 / 长文案停顿控制 / 文本清洗 / SAPI 兜底 / 场景提示音 / 蓝牙前导静音",
   "type": "module",
   "main": "dist/index.js",
