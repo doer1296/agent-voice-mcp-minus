@@ -19,7 +19,10 @@ export function createTTSEngine(options) {
     // 引擎候选链 auto（B2）：云端 Key 已配置 → cloud；缺失/未配置 → 本地平台引擎。
     // 避免红线 1「默认引擎写死厂商，无 Key 启动即报错」：auto 下无 Key 也能正常出声。
     if (engineType === "auto") {
-        if (options?.cloud?.apiKey) {
+        // 分区配置（C1.3）：扁平 cloud.apiKey 或 cloud.{volcano,mimo}.apiKey 任一存在即视为已配置
+        const c = options?.cloud || {};
+        const hasCloudKey = Boolean(c.apiKey || c.volcano?.apiKey || c.mimo?.apiKey);
+        if (hasCloudKey) {
             engineType = "cloud";
         }
         else {

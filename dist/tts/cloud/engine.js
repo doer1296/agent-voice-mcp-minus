@@ -3,18 +3,41 @@ import { tmpdir } from "os";
 import path from "path";
 import { OpenAIProvider } from "./providers/openai.js";
 import { VolcanoProvider } from "./providers/volcano.js";
+import { MiMoProvider } from "./providers/mimo.js";
 import { CustomHTTPProvider } from "./providers/custom.js";
 import { playAudioFile } from "../audio-player.js";
+// 配置分区（C1.3）：cloud.{volcano,mimo} 分区与旧扁平键共存。
+// 分区键优先于扁平键，旧配置（扁平 cloud.apiKey）不改一字仍工作（向后兼容）。
+function mergeCloudPartition(cloud) {
+    let provider = cloud.provider;
+    if (!provider) {
+        // 未显式指定 provider：按存在的分区探测；仅扁平键（无任何分区）则默认 volcano
+        if (cloud.mimo && !cloud.volcano) {
+            provider = "mimo";
+        }
+        else {
+            provider = "volcano";
+        }
+    }
+    const partition = cloud[provider];
+    if (!partition || typeof partition !== "object") {
+        return { ...cloud, provider };
+    }
+    return { ...cloud, provider, ...partition };
+}
 function createProvider(config) {
-    switch (config.provider) {
+    const merged = mergeCloudPartition(config);
+    switch (merged.provider) {
         case "openai":
-            return new OpenAIProvider(config);
+            return new OpenAIProvider(merged);
         case "volcano":
-            return new VolcanoProvider(config);
+            return new VolcanoProvider(merged);
+        case "mimo":
+            return new MiMoProvider(merged);
         case "custom":
-            return new CustomHTTPProvider(config);
+            return new CustomHTTPProvider(merged);
         default:
-            throw new Error(`Unknown cloud TTS provider: ${config.provider}`);
+            throw new Error(`Unknown cloud TTS provider: ${merged.provider}`);
     }
 }
 export class CloudTTSEngine {
@@ -37,6 +60,7 @@ export class CloudTTSEngine {
                 volume: options?.volume,
                 emotion: options?.emotion,
                 emotionIntensity: options?.emotionIntensity,
+                scene: options?.scene,
             });
             const ext = ".wav";
             const tempFile = path.join(tmpdir(), `agent-voice-cloud-${Date.now()}${ext}`);

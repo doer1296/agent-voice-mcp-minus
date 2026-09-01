@@ -166,6 +166,10 @@ server.registerTool("speak", {
         emotion: safeEmotion,
         emotionIntensity,
     }, role);
+    // scene 透传给 provider（MiMo scenePrompts 场景导演指令依赖）
+    if (safeScene) {
+        resolved.scene = safeScene;
+    }
     // 合成前清洗与截断（P4）：去代码块/URL/Markdown 标记，避免读出「井号、反引号」
     let speechText = cfg.textClean !== false
         ? cleanSpeechText(text)
