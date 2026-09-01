@@ -11,6 +11,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
 import { spawn } from "child_process";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require("../package.json");
 const config = loadConfig();
 const engine = createTTSEngine({
     engine: config.engine,
@@ -78,7 +81,7 @@ process.stdin.on("end", () => {
 });
 const server = new McpServer({
     name: "agent-voice-minus",
-    version: "1.3.0",
+    version: PKG_VERSION,
 });
 const VALID_SCENES = ["task_start", "task_complete", "task_error", "need_interaction", "milestone"];
 const VALID_EMOTIONS = ["neutral", "happy", "sad", "angry", "calm", "excited"];

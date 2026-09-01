@@ -24,6 +24,24 @@ function resolveEnvVars(obj) {
     }
     return obj;
 }
+// 未设置的环境变量会保留 ${VAR} 字面量，若不剥离会被下游当作「已配置的 Key」
+// （首次调用才发现 401 才降级）。这里统一清理为 undefined，让调用方走「未配置」分支。
+function stripUnresolvedEnvLiterals(obj) {
+    if (typeof obj === "string") {
+        return /\$\{[^}]+\}/.test(obj) ? undefined : obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj;
+    }
+    if (obj !== null && typeof obj === "object") {
+        const result = {};
+        for (const [key, value] of Object.entries(obj)) {
+            result[key] = stripUnresolvedEnvLiterals(value);
+        }
+        return result;
+    }
+    return obj;
+}
 export function loadConfig(configPath) {
     const resolvedPath = configPath || DEFAULT_CONFIG_PATH;
     if (!configPath && cachedConfig)
@@ -32,7 +50,11 @@ export function loadConfig(configPath) {
     if (existsSync(resolvedPath)) {
         try {
             fileConfig = JSON.parse(readFileSync(resolvedPath, "utf-8"));
-            fileConfig = resolveEnvVars(fileConfig);
+            fileConfig = stripUnresolvedEnvLiterals(resolveEnvVars(fileConfig));
+            if (fileConfig.cloud?.apiKey === undefined && existsSync(resolvedPath)) {
+                // 占位符未被环境变量替换：提示后按未配置处理（不会发起注定 401 的请求）
+                console.error(`agent-voice: cloud.apiKey 引用了未设置的环境变量（${resolvedPath}），按未配置处理`);
+            }
         }
         catch {
             console.error(`Failed to parse config file: ${resolvedPath}, using defaults`);

@@ -88,7 +88,7 @@ export async function playNotificationSound(sound) {
         return;
     }
     const args = playerCmd === "powershell"
-        ? ["-NoProfile", "-c", `(New-Object Media.SoundPlayer '${soundPath}').Play(); Start-Sleep -Seconds 3`]
+        ? ["-NoProfile", "-c", `(New-Object Media.SoundPlayer '${soundPath}').PlaySync();`]
         : [soundPath];
     await playFile(playerCmd, args);
 }
