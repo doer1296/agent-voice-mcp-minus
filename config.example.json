@@ -14,8 +14,21 @@
     "pauseControl": true,
     "pauseSentenceMs": 400,
     "pauseCommaMs": 200,
-    "timeout": 30000
+    "timeout": 30000,
+    "mimo": {
+      "_comment": "MiMo V2.5 第二引擎（可选）：把 provider 改为 mimo 并填 apiKey 即启用。情绪/语速/音量由自然语言指令表达（客户端量化），无数值级控制。",
+      "apiKey": "${MIMO_API_KEY}",
+      "voice": "冰糖",
+      "model": "mimo-v2.5-tts",
+      "emotionPrompts": {
+        "happy": "用轻快上扬、充满喜悦的语气朗读，声音明亮有活力"
+      },
+      "scenePrompts": {
+        "task_error": "报告错误时语气严肃但不夸张，语速平稳"
+      }
+    }
   },
+  "startupWelcome": false,
   "rate": 200,
   "volume": 1.3,
   "notificationSound": "melodious",
