@@ -116,6 +116,10 @@ function splitForPauses(text, opts) {
     return segs.length >= 2 ? segs : null;
 }
 
+// 火山音色 ID 形如 zh_female_xxx_bigtts / en_male_xxx（语言前缀 + 下划线）。
+// 防串用（B4）：传入他引擎音色（如 MiMo 的「冰糖」「Mia」）时回退配置音色，
+// 避免无效 speaker 导致请求失败或音色错乱。
+const VOLCANO_VOICE_RE = /^[a-z]{2}_[a-z]+_/;
 export class VolcanoProvider {
     type = "volcano";
     config;
@@ -123,7 +127,12 @@ export class VolcanoProvider {
         this.config = config;
     }
     async synthesize(params) {
-        const voice = params.voice || this.config.voice || "zh_female_tianmeixiaoyuan_uranus_bigtts";
+        let voice = params.voice || this.config.voice || "zh_female_tianmeixiaoyuan_uranus_bigtts";
+        if (!VOLCANO_VOICE_RE.test(voice)) {
+            const fallback = this.config.voice || "zh_female_tianmeixiaoyuan_uranus_bigtts";
+            console.error(`agent-voice: voice "${voice}" 不是火山音色 ID，回退为 ${fallback}`);
+            voice = fallback;
+        }
         const apiKey = this.config.apiKey || this.config.token;
         if (!apiKey) {
             throw new Error("Volcano TTS: missing apiKey (config.cloud.apiKey)");
@@ -267,7 +276,16 @@ export class VolcanoProvider {
         }
     }
     async getVoices() {
-        return [];
+        // 火山 v3 接口无音色枚举 API。返回实测可用的精选音色（替代空数组），
+        // 完整列表以官方音色库文档为准。注意音色须与 resourceId 版本匹配。
+        return [
+            { voice: "zh_female_daimengchuanmei_moon_bigtts", resourceId: "seed-tts-1.0", note: "甜美女声（本项目默认，实测调优）" },
+            { voice: "zh_female_qingxinnvsheng_mars_bigtts", resourceId: "seed-tts-1.0", note: "清新女声（实测可用）" },
+            { voice: "zh_female_vv_uranus_bigtts", resourceId: "seed-tts-2.0", note: "甜美女声（2.0，实测可用）" },
+            {
+                note: "完整音色列表见火山引擎音色库文档：https://www.volcengine.com/docs/6561/1257584",
+            },
+        ];
     }
 }
 //# sourceMappingURL=volcano.js.map

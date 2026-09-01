@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
     volume: 1.0,
 };
 let cachedConfig = null;
+let lastGoodConfig = null;
 function resolveEnvVars(obj) {
     if (typeof obj === "string") {
         return obj.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? `\${${name}}`);
@@ -46,22 +47,36 @@ export function loadConfig(configPath) {
     const resolvedPath = configPath || DEFAULT_CONFIG_PATH;
     if (!configPath && cachedConfig)
         return cachedConfig;
-    let fileConfig = {};
+    let fileConfig = null;
+    let parseFailed = false;
     if (existsSync(resolvedPath)) {
         try {
             fileConfig = JSON.parse(readFileSync(resolvedPath, "utf-8"));
             fileConfig = stripUnresolvedEnvLiterals(resolveEnvVars(fileConfig));
-            if (fileConfig.cloud?.apiKey === undefined && existsSync(resolvedPath)) {
+            if (fileConfig.cloud?.apiKey === undefined) {
                 // 占位符未被环境变量替换：提示后按未配置处理（不会发起注定 401 的请求）
                 console.error(`agent-voice: cloud.apiKey 引用了未设置的环境变量（${resolvedPath}），按未配置处理`);
             }
         }
         catch {
-            console.error(`Failed to parse config file: ${resolvedPath}, using defaults`);
+            parseFailed = true;
+            console.error(`Failed to parse config file: ${resolvedPath}, ${lastGoodConfig ? "keeping last valid config" : "using defaults"}`);
         }
     }
-    cachedConfig = { ...DEFAULT_CONFIG, ...fileConfig };
+    if (parseFailed) {
+        // 解析失败（如写入中断/BOM/语法错误）：回退上次有效配置而非清空，避免运行中被静默重置
+        cachedConfig = lastGoodConfig ?? { ...DEFAULT_CONFIG };
+        return cachedConfig;
+    }
+    cachedConfig = { ...DEFAULT_CONFIG, ...(fileConfig ?? {}) };
+    lastGoodConfig = cachedConfig;
     return cachedConfig;
+}
+// 配置实时生效（B1）：清缓存重读。每次 speak 前调用，改 config.json 后下一条播报即生效，
+// 与 watcher 通道（每次现读）行为一致。
+export function reloadConfig() {
+    cachedConfig = null;
+    return loadConfig();
 }
 export function getConfigPath(customPath) {
     return customPath || DEFAULT_CONFIG_PATH;

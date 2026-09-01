@@ -6,12 +6,27 @@ import { EdgeTTSEngine } from "./edge-tts.js";
 import { CloudTTSEngine } from "./cloud/engine.js";
 import os from "os";
 let cachedEngine = null;
+// 配置实时生效（B1）：cloud 配置变更后允许重建引擎
+export function resetEngineCache() {
+    cachedEngine = null;
+}
 export function createTTSEngine(options) {
     if (cachedEngine) {
         return cachedEngine;
     }
     const platform = os.platform();
-    const engineType = options?.engine || platform;
+    let engineType = options?.engine || platform;
+    // 引擎候选链 auto（B2）：云端 Key 已配置 → cloud；缺失/未配置 → 本地平台引擎。
+    // 避免红线 1「默认引擎写死厂商，无 Key 启动即报错」：auto 下无 Key 也能正常出声。
+    if (engineType === "auto") {
+        if (options?.cloud?.apiKey) {
+            engineType = "cloud";
+        }
+        else {
+            engineType = platform;
+            console.error("agent-voice: engine=auto 且云端 apiKey 未配置，使用本地引擎（如需云端请在 config.json 配置 cloud.apiKey）");
+        }
+    }
     if (engineType === "piper") {
         cachedEngine = new PiperTTSEngine(options?.modelPath, options?.configPath);
         return cachedEngine;

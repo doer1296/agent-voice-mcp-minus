@@ -2,9 +2,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod/v4";
-import { createTTSEngine } from "./tts/factory.js";
+import { createTTSEngine, resetEngineCache } from "./tts/factory.js";
 import { VoiceQueue, cleanSpeechText, truncateForSpeech } from "./voice-queue.js";
-import { loadConfig, resolveOptions, resolveRole } from "./config.js";
+import { loadConfig, reloadConfig, resolveOptions, resolveRole } from "./config.js";
 import { WindowsSAPIEngine } from "./tts/windows-sapi.js";
 import os from "os";
 import path from "path";
@@ -15,17 +15,55 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require("../package.json");
 const config = loadConfig();
-const engine = createTTSEngine({
+let engine = createTTSEngine({
     engine: config.engine,
     modelPath: config.modelPath,
     configPath: config.configPath,
     cloud: config.cloud,
 });
 // 云端失败（断网/额度耗尽）时回退本地 SAPI，保证播报不中断
-const fallbackEngine = config.fallbackEngine === "windows-sapi" && os.platform() === "win32"
+let fallbackEngine = config.fallbackEngine === "windows-sapi" && os.platform() === "win32"
     ? new WindowsSAPIEngine()
     : null;
 const voiceQueue = new VoiceQueue(engine, 2, config.notificationSound, fallbackEngine);
+// 配置实时生效（B1）：speak 前重读配置；引擎级配置（engine/cloud/modelPath/fallbackEngine）
+// 变更时热重建引擎。签名不变时零开销（不重建）。队列串行处理，两轮播报之间换引擎是安全的。
+let engineSignature = "";
+function refreshEnginesIfNeeded(cfg) {
+    const signature = JSON.stringify({
+        engine: cfg.engine,
+        modelPath: cfg.modelPath,
+        configPath: cfg.configPath,
+        cloud: cfg.cloud,
+        fallbackEngine: cfg.fallbackEngine,
+    });
+    if (signature === engineSignature)
+        return;
+    const firstBuild = engineSignature === "";
+    engineSignature = signature;
+    if (firstBuild)
+        return;
+    try {
+        resetEngineCache();
+        engine = createTTSEngine({
+            engine: cfg.engine,
+            modelPath: cfg.modelPath,
+            configPath: cfg.configPath,
+            cloud: cfg.cloud,
+        });
+        voiceQueue.engine = engine;
+        fallbackEngine = cfg.fallbackEngine === "windows-sapi" && os.platform() === "win32"
+            ? new WindowsSAPIEngine()
+            : null;
+        voiceQueue.fallbackEngine = fallbackEngine;
+        console.error("agent-voice: engine config changed, engine rebuilt");
+    }
+    catch (e) {
+        console.error(`agent-voice: engine rebuild failed (${e.message}), keeping previous engine`);
+        // 重建失败回退旧签名，下次重试
+        engineSignature = "";
+    }
+}
 // 附属监听器（pending.txt 备用播报通道）：与主服务同生命周期，由 config.watcher 开关
 // script 未配置时默认使用包内 watcher/voice-watcher.mjs（与 dist/ 同级），开源场景零配置
 // 单实例守卫（TCP 47613）保证多会话只跑一份；守卫被占时子进程退出，稍后重试接管
@@ -107,6 +145,10 @@ server.registerTool("speak", {
             .describe("指定播报角色名称或目标Agent名称（如'Trae'、'Claude'）。可用角色参见 get_roles 工具返回的列表。未指定时使用配置的第一个角色"),
     },
 }, async ({ text, voice, rate, volume, scene, emotion, emotionIntensity, role: roleParam }) => {
+    // 配置实时生效（B1）：每次播报前重读 config.json；引擎级配置变更时热重建
+    const cfg = reloadConfig();
+    refreshEnginesIfNeeded(cfg);
+    voiceQueue.notificationSound = cfg.notificationSound;
     // 参数容错：非法值使用默认/首个枚举
     const safeScene = (scene && VALID_SCENES.includes(scene))
         ? scene
@@ -116,8 +158,8 @@ server.registerTool("speak", {
         : (emotion ? VALID_EMOTIONS[0] : undefined);
     const safeRate = rate !== undefined ? Math.max(50, Math.min(300, rate)) : undefined;
     const safeVolume = volume !== undefined ? Math.max(0, Math.min(1, volume)) : undefined;
-    const role = resolveRole(config.roles, roleParam);
-    const resolved = resolveOptions(config, safeScene, {
+    const role = resolveRole(cfg.roles, roleParam);
+    const resolved = resolveOptions(cfg, safeScene, {
         voice,
         rate: safeRate,
         volume: safeVolume,
@@ -125,15 +167,15 @@ server.registerTool("speak", {
         emotionIntensity,
     }, role);
     // 合成前清洗与截断（P4）：去代码块/URL/Markdown 标记，避免读出「井号、反引号」
-    let speechText = config.textClean !== false
+    let speechText = cfg.textClean !== false
         ? cleanSpeechText(text)
         : String(text ?? "");
-    speechText = truncateForSpeech(speechText, config.maxTextLength ?? 200);
+    speechText = truncateForSpeech(speechText, cfg.maxTextLength ?? 200);
     if (speechText) {
         // 场景提示音优先：sceneSounds[scene] > 角色提示音 > 全局提示音
-        const sceneSound = (safeScene && config.sceneSounds?.[safeScene])
+        const sceneSound = (safeScene && cfg.sceneSounds?.[safeScene])
             ?? role?.notificationSound
-            ?? config.notificationSound;
+            ?? cfg.notificationSound;
         voiceQueue.enqueue(speechText, resolved, sceneSound);
     }
     return {
@@ -162,7 +204,8 @@ server.registerTool("get_roles", {
     description: "获取当前配置中所有可用的播报角色列表（v1.1.0）。返回每个角色的 name、target（适用范围说明）、voice 信息，Agent 据此决定 speak 时传入哪个 role 参数。无角色配置时返回空数组。",
     inputSchema: {},
 }, async () => {
-    const roles = (config.roles ?? []).map((r) => ({
+    const cfg = reloadConfig();
+    const roles = (cfg.roles ?? []).map((r) => ({
         name: r.name,
         target: r.target ?? null,
         voice: r.voice ?? null,
@@ -174,8 +217,13 @@ server.registerTool("get_roles", {
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    const resolved = resolveOptions(config);
-    voiceQueue.enqueue("agent-voice 服务已启动", resolved);
+    // 启动欢迎语（B3）：config.startupWelcome —— 字符串自定义文案，false 关闭，缺省原文案
+    const welcome = config.startupWelcome;
+    if (welcome !== false) {
+        const text = typeof welcome === "string" && welcome.trim() ? welcome.trim() : "agent-voice 服务已启动";
+        const resolved = resolveOptions(config);
+        voiceQueue.enqueue(text, resolved);
+    }
 }
 main().catch((error) => {
     console.error("agent-voice server error:", error);
